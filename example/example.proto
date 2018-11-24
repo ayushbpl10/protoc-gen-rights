@@ -3,7 +3,7 @@ syntax = "proto3";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 
-import "zap/zap.proto";
+import "rights/rights.proto";
 
 package example;
 

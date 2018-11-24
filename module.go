@@ -5,8 +5,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/lyft/protoc-gen-star"
 	"github.com/lyft/protoc-gen-star/lang/go"
-	"github.com/shankulkarni/protoc-gen-zap/rights"
-	"github.com/shankulkarni/protoc-gen-zap/zap"
+	"github.com/ayushbpl10/protoc-gen-rights/rights"
 	"regexp"
 	"strings"
 )
