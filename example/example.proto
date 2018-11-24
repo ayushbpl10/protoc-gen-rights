@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+import "zap/zap.proto";
+
+package example;
+
+
+message User {
+//    string id = 1;
+//    string first_name = 2  [(zap.redact) = true];
+//    string last_name = 3  [(zap.redact) = true];
+//    int64 employee_number = 4 [(zap.redact) = true];
+//    string physical_desk = 6;
+//    ServiceMsg service =8;
+//
+    repeated string blocked = 1;
+
+    map<string, string> extra = 2;
+    .google.protobuf.Timestamp hire_date = 3;
+}
+
+
+//message ServiceMsg {
+//    string id = 1;
+//    string name = 2;
+//}
+message GetUserReq{
+    string user_id = 1;
+    Demo tent_id = 2;
+}
+
+message Demo {
+    string tent = 1;
+}
+service Users {
+    rpc AddUser(User) returns (.google.protobuf.Empty){
+        option (zap.validator) = {
+            resource: "/users/{user_id}/cards/"
+            right: 2
+        };
+    };
+    rpc GetUser(GetUserReq) returns (User){
+        option (zap.validator) = {
+            resource: "/users/{user_id}/cards/{tent_id.tent}"
+            right: 1
+        };
+    };
+}

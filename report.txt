@@ -1,0 +1,15 @@
+ example/example.proto.proto 
+ 
+000. User 
+	 |- 0. Id TYPE_STRING 	 redact: false
+ 	 |- 1. FirstName TYPE_STRING 	 redact: false
+ 	 |- 2. LastName TYPE_STRING 	 redact: false
+ 	 |- 3. EmployeeNumber TYPE_INT64 	 redact: true
+ 	 |- 4. HireDate TYPE_MESSAGE 	 redact: false
+ 	 |- 5. PhysicalDesk TYPE_STRING 	 redact: false
+ 	 |- 6. Metadata TYPE_MESSAGE 	 redact: false
+ 	 |- 7. Blocked TYPE_STRING 	 redact: false
+ 001. Service 
+	 |- 0. Id TYPE_STRING 	 redact: false
+ 	 |- 1. Name TYPE_STRING 	 redact: false
+ 
