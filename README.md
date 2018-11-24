@@ -1,5 +1,4 @@
-# protoc-gen-zap
+# protoc-gen-rights
 
-Generates code for zap core.ObjectMarshaler from proto messages for faster marshaling   .
+Generates code for rights from proto messages for rights implememntation .
 
-### Example
