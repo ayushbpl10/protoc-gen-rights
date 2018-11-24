@@ -2,10 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/ayushbpl10/protoc-gen-rights/rights"
 	"github.com/golang/protobuf/proto"
 	"github.com/lyft/protoc-gen-star"
 	"github.com/lyft/protoc-gen-star/lang/go"
-	"github.com/ayushbpl10/protoc-gen-rights/rights"
 	"regexp"
 	"strings"
 )
@@ -26,9 +26,18 @@ func (m *rightsGen) InitContext(c pgs.BuildContext) {
 
 func (m *rightsGen) Execute(targets map[string]pgs.File, packages map[string]pgs.Package) []pgs.Artifact {
 
+	modulePath := "github.com/ayushbpl10/protoc-gen-rights/example/"
+
 	for _, f := range targets {
-		name := m.Context.OutputPath(f).SetExt(".zap.go").String()
+
+
+		name := m.Context.OutputPath(f).SetExt(".rights.go").String()
 		fm := fileModel{PackageName: m.Context.PackageName(f).String(), }
+		for _,im := range f.Imports() {
+			fm.Imports = append(fm.Imports, im.Descriptor().Options.GetGoPackage())
+		}
+
+		fm.Imports = append(fm.Imports, modulePath+f.Descriptor().Options.GetGoPackage())
 
 
 		for _,srv := range f.Services() {
@@ -54,7 +63,9 @@ func (m *rightsGen) Execute(targets map[string]pgs.File, packages map[string]pgs
 					panic(err)
 				}
 
-				rpcModel := rpcModel{RpcName: rpc.Name().UpperCamelCase().String(), Input: rpc.Input().Name().UpperCamelCase().String(), Output: rpc.Output().Name().UpperCamelCase().String(), Option: rights}
+				//m.Log(rpc.Output().Package().ProtoName())
+
+				rpcModel := rpcModel{RpcName: rpc.Name().UpperCamelCase().String(), Input: rpc.Input().Name().UpperCamelCase().String(), Output: rpc.Output().Name().UpperCamelCase().String(), Option: rights,PackageName: m.Context.PackageName(f).String()}
 
 				re := regexp.MustCompile("{([^{]*)}")
 				fieldsInResource := re.FindAllStringSubmatch(rights.Resource, -1)
@@ -77,7 +88,7 @@ func (m *rightsGen) Execute(targets map[string]pgs.File, packages map[string]pgs
 						}
 					}
 					if fieldVsGetString[fr] != "" {
-						m.Log(fieldVsGetString[fr],fr)
+						//m.Log(fieldVsGetString[fr],fr)
 						rpcModel.GetString = append(rpcModel.GetString, fieldVsGetString[fr])
 					}
 				}
@@ -132,6 +143,7 @@ func (m *rightsGen) Execute(targets map[string]pgs.File, packages map[string]pgs
 }
 
 type rpcModel struct {
+	PackageName string
 	RpcName     string
 	Input    string
 	Output   string
@@ -147,6 +159,7 @@ type serviceModel struct {
 
 type fileModel struct {
 	PackageName string
+	Imports     []string
 	Services    []serviceModel
 }
 // Converts a string to CamelCase
