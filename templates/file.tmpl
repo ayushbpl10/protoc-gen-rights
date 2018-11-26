@@ -9,6 +9,7 @@ import "google.golang.org/grpc/codes"
 import "google.golang.org/grpc/status"
 import "go.uber.org/fx"
 import "go.appointy.com/google/pb/rights"
+import "go.appointy.com/google/userinfo"
 
 {{ range .Imports }}
 import "{{ .}}"
@@ -42,17 +43,23 @@ import "{{ .}}"
         }
     }
 
-    {{ range $service.Rpcs }}
-        func (s *Rights{{$service.ServiceName}}Server) {{.RpcName}}(ctx context.Context, rightsvar *{{ .PackageName }}.{{.Input}}) ({{if eq .Output "Empty"}}*empty.{{.Output}}{{else}}*{{ .PackageName }}.{{.Output}}{{end}}, error) {
+    {{ range $rpc := $service.Rpcs }}
+        func (s *Rights{{$service.ServiceName}}Server) {{$rpc.RpcName}}(ctx context.Context, rightsvar *{{ $rpc.PackageName }}.{{$rpc.Input}}) ({{if eq $rpc.Output "Empty"}}*empty.{{$rpc.Output}}{{else}}*{{ $rpc.PackageName }}.{{$rpc.Output}}{{end}}, error) {
+
+
 
             res, err := s.rightsCli.IsValid(ctx, &rights.IsValidReq{
-                ResourcePath: fmt.Sprintf("{{.Option.Resource}}", {{ range .GetString}} rightsvar.{{.}}, {{end}} ),
-                Value:        {{.Option.Right}},
+                ResourcePath: []string{ {{ range $rpc.Option.Resource}}fmt.Sprintf("{{.}}", {{ range $rpc.GetString}} rightsvar.{{.}}, {{end}} ),{{end}} },
+                Value:        {{$rpc.Option.Right}},
+                Choice:       {{$rpc.ChoiceOfRight}},
                 UserId:       userinfo.FromContext(ctx).Id,
             })
             if err != nil {
                 return nil, err
             }
+
+
+
 
             if !res.IsValid {
                 return nil, status.Errorf(codes.PermissionDenied, res.Reason)

@@ -9,6 +9,7 @@ package example;
 
 option go_package = "example/pb";
 
+
 message User {
 //    string id = 1;
 //    string first_name = 2  [(zap.redact) = true];
@@ -38,15 +39,20 @@ message Demo {
 }
 service Users {
     rpc AddUser(User) returns (.google.protobuf.Empty){
-        option (zap.validator) = {
+        option (rights.validator) = {
             resource: "/users/{user_id}/cards/"
+            resource: "/users/{user_id}/cards/user"
             right: 2
+            choice: 0
         };
     };
     rpc GetUser(GetUserReq) returns (User){
-        option (zap.validator) = {
+        option (rights.validator) = {
             resource: "/users/{user_id}/cards/{tent_id.tent}"
+            resource: "/users/{user_id}/cards/{tent_id.tent}/ex"
             right: 1
+            choice: 1
         };
     };
+
 }

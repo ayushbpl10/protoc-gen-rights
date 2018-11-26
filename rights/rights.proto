@@ -1,16 +1,22 @@
 syntax = "proto3";
 
-package zap;
+package rights;
 
 import "google/protobuf/descriptor.proto";
 
-option go_package="zappb";
+option go_package="rightspb";
 
 extend google.protobuf.MethodOptions {
     MyRights validator = 9955;
 }
 
 message MyRights {
-    string resource = 1;
+    repeated string resource = 1;
     int32 right = 2;
+    ChoiceOfRight choice = 3;
+}
+
+enum ChoiceOfRight {
+    AND = 0;
+    OR = 1;
 }

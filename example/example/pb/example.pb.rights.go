@@ -8,16 +8,12 @@ import "google.golang.org/grpc/codes"
 import "google.golang.org/grpc/status"
 import "go.uber.org/fx"
 import "go.appointy.com/google/pb/rights"
+import "go.appointy.com/google/userinfo"
 
-
-import "github.com/golang/protobuf/ptypes/timestamp"
 
 import "github.com/golang/protobuf/ptypes/empty"
 
 import "github.com/ayushbpl10/protoc-gen-rights/example/example/pb"
-
-
-
 
 
 
@@ -51,14 +47,20 @@ import "github.com/ayushbpl10/protoc-gen-rights/example/example/pb"
     
         func (s *RightsUsersServer) AddUser(ctx context.Context, rightsvar *pb.User) (*empty.Empty, error) {
 
+
+
             res, err := s.rightsCli.IsValid(ctx, &rights.IsValidReq{
-                ResourcePath: fmt.Sprintf("/users/{user_id}/cards/",  rightsvar.GetUserId(),  ),
+                ResourcePath: []string{ fmt.Sprintf("/users/%s/cards/",  rightsvar.GetUserId(),  ),fmt.Sprintf("/users/%s/cards/user",  rightsvar.GetUserId(),  ), },
                 Value:        2,
+                Choice:       0,
                 UserId:       userinfo.FromContext(ctx).Id,
             })
             if err != nil {
                 return nil, err
             }
+
+
+
 
             if !res.IsValid {
                 return nil, status.Errorf(codes.PermissionDenied, res.Reason)
@@ -69,14 +71,20 @@ import "github.com/ayushbpl10/protoc-gen-rights/example/example/pb"
     
         func (s *RightsUsersServer) GetUser(ctx context.Context, rightsvar *pb.GetUserReq) (*pb.User, error) {
 
+
+
             res, err := s.rightsCli.IsValid(ctx, &rights.IsValidReq{
-                ResourcePath: fmt.Sprintf("/users/{user_id}/cards/{tent_id.tent}",  rightsvar.GetUserId(),  rightsvar.GetTentId().GetTent(),  ),
+                ResourcePath: []string{ fmt.Sprintf("/users/{user_id}/cards/%s",  rightsvar.GetUserId(),  rightsvar.GetTentId().GetTent(),  ),fmt.Sprintf("/users/{user_id}/cards/%s/ex",  rightsvar.GetUserId(),  rightsvar.GetTentId().GetTent(),  ), },
                 Value:        1,
+                Choice:       1,
                 UserId:       userinfo.FromContext(ctx).Id,
             })
             if err != nil {
                 return nil, err
             }
+
+
+
 
             if !res.IsValid {
                 return nil, status.Errorf(codes.PermissionDenied, res.Reason)

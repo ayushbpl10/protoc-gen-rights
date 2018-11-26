@@ -49,7 +49,7 @@ func (m *rightsGen) Execute(targets map[string]pgs.File, packages map[string]pgs
 			for _, rpc := range srv.Methods() {
 
 				opt := rpc.Descriptor().GetOptions()
-				option, err := proto.GetExtension(opt, zappb.E_Validator)
+				option, err := proto.GetExtension(opt, rightspb.E_Validator)
 				if err != nil {
 					panic(err)
 				}
@@ -57,28 +57,33 @@ func (m *rightsGen) Execute(targets map[string]pgs.File, packages map[string]pgs
 				if err != nil {
 					panic(err)
 				}
-				rights := zappb.MyRights{}
-				err = json.Unmarshal(byteData, &rights)
+				right := rightspb.MyRights{}
+				err = json.Unmarshal(byteData, &right)
 				if err != nil {
 					panic(err)
 				}
 
 				//m.Log(rpc.Output().Package().ProtoName())
 
-				rpcModel := rpcModel{RpcName: rpc.Name().UpperCamelCase().String(), Input: rpc.Input().Name().UpperCamelCase().String(), Output: rpc.Output().Name().UpperCamelCase().String(), Option: rights,PackageName: m.Context.PackageName(f).String()}
+				rpcModel := rpcModel{RpcName: rpc.Name().UpperCamelCase().String(), Input: rpc.Input().Name().UpperCamelCase().String(), Output: rpc.Output().Name().UpperCamelCase().String(), Option: right,PackageName: m.Context.PackageName(f).String(), ChoiceOfRight: int(right.Choice)}
 
 				re := regexp.MustCompile("{([^{]*)}")
-				fieldsInResource := re.FindAllStringSubmatch(rights.Resource, -1)
+				fieldsInResource := make([][]string,0)
+				for _, fieldRight := range right.Resource {
+					fieldsInResource = re.FindAllStringSubmatch(fieldRight, -1)
+				}
 				//m.Log(rights)
 				fieldVsfieldSeperated := make(map[string][]string, 0)
 				fieldVsGetString := make(map[string]string, 0)
+				ToBEreplacedByPlaceHolder := make([]string,0)
 				for _, fr := range fieldsInResource {
-					//m.Log(fr[1])
+					ToBEreplacedByPlaceHolder = append(ToBEreplacedByPlaceHolder, fr[0])
 					fieldVsfieldSeperated[fr[1]] = strings.Split(fr[1], ".")
 				}
 
 				//m.Log(inputField.Name())
 				for fr, dotSeperatedkeys := range fieldVsfieldSeperated {
+
 
 					for _, r := range dotSeperatedkeys {
 						if _, ok := fieldVsGetString[fr]; ok {
@@ -90,6 +95,11 @@ func (m *rightsGen) Execute(targets map[string]pgs.File, packages map[string]pgs
 					if fieldVsGetString[fr] != "" {
 						//m.Log(fieldVsGetString[fr],fr)
 						rpcModel.GetString = append(rpcModel.GetString, fieldVsGetString[fr])
+					}
+				}
+				for i,r := range rpcModel.Option.Resource {
+					for _ , p := range ToBEreplacedByPlaceHolder{
+						rpcModel.Option.Resource[i] = strings.Replace(r,p,"%s",-1)
 					}
 				}
 
@@ -148,7 +158,8 @@ type rpcModel struct {
 	Input    string
 	Output   string
 	GetString []string
-	Option   zappb.MyRights
+	Option   rightspb.MyRights
+	ChoiceOfRight int
 }
 
 type serviceModel struct {
