@@ -11,17 +11,17 @@ option go_package = "example/pb";
 
 
 message User {
-//    string id = 1;
+    string id = 1;
 //    string first_name = 2  [(zap.redact) = true];
 //    string last_name = 3  [(zap.redact) = true];
 //    int64 employee_number = 4 [(zap.redact) = true];
 //    string physical_desk = 6;
 //    ServiceMsg service =8;
 //
-    repeated string blocked = 1;
+    repeated string blocked = 2;
 
-    map<string, string> extra = 2;
-    .google.protobuf.Timestamp hire_date = 3;
+    map<string, string> extra = 3;
+    .google.protobuf.Timestamp hire_date = 4;
 }
 
 
@@ -32,27 +32,43 @@ message User {
 message GetUserReq{
     string user_id = 1;
     Demo tent_id = 2;
+    repeated UserEmails user_email = 3;
+}
+
+message UserEmails {
+    string email = 1;
+    repeated Check checks = 2;
+}
+
+message Check {
+    string check = 1;
 }
 
 message Demo {
     string tent = 1;
 }
+message UpdateUserReq {
+    string id = 1;
+}
+
 service Users {
     rpc AddUser(User) returns (.google.protobuf.Empty){
         option (rights.validator) = {
-            resource: "/users/{user_id}/cards/"
-            resource: "/users/{user_id}/cards/user"
-            right: 2
-            choice: 0
+            resource: "/users/{id}/cards.read/{blocked}"
+            resource: "/users/{id}/cards/user.write"
         };
     };
-    rpc GetUser(GetUserReq) returns (User){
+    rpc GetUser(GetUserReq) returns (User) {
         option (rights.validator) = {
-            resource: "/users/{user_id}/cards/{tent_id.tent}"
-            resource: "/users/{user_id}/cards/{tent_id.tent}/ex"
-            right: 1
-            choice: 1
+            resource: "/{user_email.email}/users/{user_id}/cards/{tent_id.tent}/email/{user_email.email.checks.check}"
+            resource: "/users/{user_id}/cards/{tent_id.tent}/ex.write"
         };
     };
+    rpc UpdateUser(UpdateUserReq) returns (.google.protobuf.Empty){
+        option (rights.validator) = {
+            resource: "/users/{id}/cards.read/"
+            resource: "/users/{id}/cards/user.write"
+        };
+    }
 
 }

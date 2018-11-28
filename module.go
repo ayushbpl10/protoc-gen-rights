@@ -48,6 +48,7 @@ func (m *rightsGen) Execute(targets map[string]pgs.File, packages map[string]pgs
 
 			for _, rpc := range srv.Methods() {
 
+
 				opt := rpc.Descriptor().GetOptions()
 				option, err := proto.GetExtension(opt, rightspb.E_Validator)
 				if err != nil {
@@ -65,107 +66,289 @@ func (m *rightsGen) Execute(targets map[string]pgs.File, packages map[string]pgs
 
 				//m.Log(rpc.Output().Package().ProtoName())
 
-				rpcModel := rpcModel{RpcName: rpc.Name().UpperCamelCase().String(), Input: rpc.Input().Name().UpperCamelCase().String(), Output: rpc.Output().Name().UpperCamelCase().String(), Option: right,PackageName: m.Context.PackageName(f).String(), ChoiceOfRight: int(right.Choice)}
+				rpcModel := rpcModel{RpcName: rpc.Name().UpperCamelCase().String(), Input: rpc.Input().Name().UpperCamelCase().String(), Output: rpc.Output().Name().UpperCamelCase().String(), Option: right,PackageName: m.Context.PackageName(f).String()}
 
 				re := regexp.MustCompile("{([^{]*)}")
-				fieldsInResource := make([][]string,0)
+				//[right] : [with{} , without{}]
+				fieldsInResource := make(map[string][][]string,0)
 				for _, fieldRight := range right.Resource {
-					fieldsInResource = re.FindAllStringSubmatch(fieldRight, -1)
+					fieldsInResource[fieldRight] = append(fieldsInResource[fieldRight],re.FindAllStringSubmatch(fieldRight, -1)...)
 				}
-				//m.Log(rights)
-				fieldVsfieldSeperated := make(map[string][]string, 0)
-				fieldVsGetString := make(map[string]string, 0)
+
+				//[right] : {[without {}] : seperatedFields}
+				fieldVsfieldSeperatedRightMap := make(map[string]map[string][]string,0)
+
+				//Track keys to maintan map order
+				fieldVsfieldSeperatedRightMapTrack := make(map[string][]string)
+
 				ToBEreplacedByPlaceHolder := make([]string,0)
-				for _, fr := range fieldsInResource {
-					ToBEreplacedByPlaceHolder = append(ToBEreplacedByPlaceHolder, fr[0])
-					fieldVsfieldSeperated[fr[1]] = strings.Split(fr[1], ".")
+
+				for fieldRight, ArrayOfCurlyBraces := range fieldsInResource {
+					fieldVsfieldSeperated := make(map[string][]string, 0)
+					for _, fr := range ArrayOfCurlyBraces {
+						//%s place holders
+						ToBEreplacedByPlaceHolder = append(ToBEreplacedByPlaceHolder, fr[0])
+						//splitting the dot operator
+						fieldVsfieldSeperated[fr[1]] = strings.Split(fr[1], ".")
+
+						fieldVsfieldSeperatedRightMapTrack[fieldRight] = append(fieldVsfieldSeperatedRightMapTrack[fieldRight],fr[1])
+						fieldVsfieldSeperatedRightMap[fieldRight] = fieldVsfieldSeperated
+					}
 				}
 
-				//m.Log(inputField.Name())
-				for fr, dotSeperatedkeys := range fieldVsfieldSeperated {
+				//[right] : isrepeated
+				RightRepeatedMap := make(map[string]bool)
 
+				for rightVal, fieldVsfieldSeperatedElement := range fieldVsfieldSeperatedRightMap {
 
-					for _, r := range dotSeperatedkeys {
-						if _, ok := fieldVsGetString[fr]; ok {
-							fieldVsGetString[fr] = fieldVsGetString[fr] + ".Get" + toCamelInitCase(r,true)+"()"
-						} else {
-							fieldVsGetString[fr] = "Get" + toCamelInitCase(r,true)+"()"
+					for _,inOrder := range fieldVsfieldSeperatedRightMapTrack[rightVal]{
+
+						dotSeperatedkeys,_  := fieldVsfieldSeperatedElement[inOrder]
+
+						for _, r := range dotSeperatedkeys {
+							//m.Log(r)
+							//checking the key is a field in message
+							found := false
+							IsRepeated := false
+							for _,msg := range f.AllMessages() {
+								for _,field := range msg.Fields() {
+									if field.Name().String() == r {
+										found = true
+										IsRepeated = field.Type().IsRepeated()
+									}
+								}
+							}
+							if !found {
+								m.Log("key is not a primitive type : " + r)
+							}
+
+							if IsRepeated {
+								RightRepeatedMap[rightVal] = true
+							}
 						}
 					}
-					if fieldVsGetString[fr] != "" {
-						//m.Log(fieldVsGetString[fr],fr)
-						rpcModel.GetString = append(rpcModel.GetString, fieldVsGetString[fr])
-					}
-				}
-				for i,r := range rpcModel.Option.Resource {
-					for _ , p := range ToBEreplacedByPlaceHolder{
-						rpcModel.Option.Resource[i] = strings.Replace(r,p,"%s",-1)
-					}
+
+
 				}
 
-				service.Rpcs = append(service.Rpcs, rpcModel)
+
+				//if GlobalIsRepeated {
+					for rightVal, fieldVsfieldSeperatedElement := range fieldVsfieldSeperatedRightMap {
+
+						fieldVsGetString := make(map[string]string, 0)
+						resource := Resource{}
+						//if repeated
+						if RightRepeatedMap[rightVal] {
+							for _,inOrder := range fieldVsfieldSeperatedRightMapTrack[rightVal]{
+								fr := inOrder
+								dotSeperatedkeys,_ := fieldVsfieldSeperatedElement[inOrder]
+
+									//m.Log(fr)
+									//[without curly braces] : Current For Loop Dotted Access
+									ForLoopMapWithGet := make(map[string]string, 0)
+									ForLoopMapWithOutGet := make(map[string]string, 0)
+									for _, r := range dotSeperatedkeys {
+
+										//checking field is repeated
+										IsRepeated := false
+										IsNotPrimitive := false
+										IsRepeatedPrimitive := false
+										for _, msg := range f.AllMessages() {
+
+											for _, field := range msg.Fields() {
+												if field.Name().String() == r {
+													IsRepeated = field.Type().IsRepeated()
+													IsNotPrimitive = field.Type().IsEmbed()
+													if field.Type().Element() != nil {
+														IsRepeatedPrimitive = field.Type().Element().IsEmbed()
+													}
+
+												}
+											}
+										}
+
+										if IsRepeated {
+
+											if _, ok := ForLoopMapWithGet[fr]; !ok {
+												ForLoopMapWithGet[fr] = "Get" + toCamelInitCase(r, true)
+												ForLoopMapWithOutGet[fr] = toCamelInitCase(r, true)
+
+												//for loops already contains the previous repeated value
+												for _,forLoopResourceExists := range resource.ForLoop {
+													if strings.Contains(forLoopResourceExists.RangeKey, ForLoopMapWithOutGet[fr]) {
+														resource.ForLoop = resource.ForLoop[0 : len(resource.ForLoop)-1]
+													}
+												}
+
+											} else {
+
+												//for loops already contains the previous repeated value
+												if strings.Contains(fr, ForLoopMapWithOutGet[fr]) {
+													resource.ForLoop = resource.ForLoop[0 : len(resource.ForLoop)-1]
+												}
+												ForLoopMapWithGet[fr] = ForLoopMapWithOutGet[fr] + "." + "Get" + toCamelInitCase(r, true)
+											}
+
+
+											forLoop := ForLoop{}
+											forLoop.RangeKey = ForLoopMapWithGet[fr]
+											forLoop.ValueKey = toCamelInitCase(r, true)
+
+											resource.ForLoop = append(resource.ForLoop, forLoop)
+
+											//starting the getString from inner for loop value
+											fieldVsGetString[fr] = toCamelInitCase(r, true)
+
+										} else {
+											if _, ok := fieldVsGetString[fr]; ok {
+												fieldVsGetString[fr] = fieldVsGetString[fr] + ".Get" + toCamelInitCase(r, true) + "()"
+											} else {
+												fieldVsGetString[fr] = "Get" + toCamelInitCase(r, true) + "()"
+											}
+										}
+
+										resource.IsRepeated = RightRepeatedMap[rightVal]
+
+										if !IsRepeated {
+											if !IsNotPrimitive {
+												found := false
+												for _,strMap := range resource.GetStrings {
+													if _,ok := strMap[fieldVsGetString[fr]]; ok {
+															found = true
+													}
+												}
+												if !found {
+													mapGetString := make(map[string]bool, 0)
+													mapGetString[fieldVsGetString[fr]] = false
+													for _,forLoop := range resource.ForLoop {
+														if strings.Contains(fieldVsGetString[fr],forLoop.ValueKey){
+															//m.Log(fr,fieldVsGetString[fr])
+															mapGetString[fieldVsGetString[fr]] = true
+														}
+													}
+
+													resource.GetStrings = append(resource.GetStrings, mapGetString)
+												}
+											}
+										}else{
+											if !IsRepeatedPrimitive {
+												mapGetString := make(map[string]bool, 0)
+												mapGetString[fieldVsGetString[fr]] = false
+												for _,forLoop := range resource.ForLoop {
+													if strings.Contains(fieldVsGetString[fr],forLoop.ValueKey){
+														//m.Log(fr,fieldVsGetString[fr])
+														mapGetString[fieldVsGetString[fr]] = true
+													}
+												}
+
+												resource.GetStrings = append(resource.GetStrings, mapGetString)
+											}
+
+										}
+
+										resource.ResourceStringWithCurlyBraces = rightVal
+									}
+
+
+
+							}
+							//preparing formatted string
+							resource.ResourceStringWithFormatter = rightVal
+							for _ , p := range ToBEreplacedByPlaceHolder {
+								resource.ResourceStringWithFormatter = strings.Replace(resource.ResourceStringWithFormatter,p,"%s",-1)
+							}
+
+							rpcModel.Resources = append(rpcModel.Resources, resource)
+
+						} else{
+							for fr, dotSeperatedkeys := range fieldVsfieldSeperatedElement {
+
+								for _, r := range dotSeperatedkeys {
+
+									//checking field is repeated
+									IsNotPrimitive := false
+									for _,msg := range f.AllMessages() {
+
+										for _,field := range msg.Fields() {
+											if field.Name().String() == r {
+												IsNotPrimitive = field.Type().IsEmbed()
+											}
+										}
+									}
+
+									if _, ok := fieldVsGetString[fr]; ok {
+										fieldVsGetString[fr] = fieldVsGetString[fr] + ".Get" + toCamelInitCase(r,true)+"()"
+									} else {
+										fieldVsGetString[fr] = "Get" + toCamelInitCase(r,true)+"()"
+									}
+
+
+									resource.IsRepeated = RightRepeatedMap[rightVal]
+
+									if !IsNotPrimitive {
+										mapGetString := make(map[string]bool, 0)
+										mapGetString[fieldVsGetString[fr]] = false
+										resource.GetStrings = append(resource.GetStrings,mapGetString)
+									}
+
+									resource.ResourceStringWithCurlyBraces = rightVal
+								}
+
+							}
+
+							//preparing formatted string
+							resource.ResourceStringWithFormatter = rightVal
+							for _ , p := range ToBEreplacedByPlaceHolder {
+								resource.ResourceStringWithFormatter = strings.Replace(resource.ResourceStringWithFormatter,p,"%s",-1)
+							}
+
+							rpcModel.Resources = append(rpcModel.Resources, resource)
+						}
+					}
+
+					service.Rpcs = append(service.Rpcs, rpcModel)
+				}
+
+				fm.Services = append(fm.Services, service)
 			}
-			fm.Services = append(fm.Services, service)
-			//for _, msg := range f.AllMessages() {
-			//
-			//	fields := msg.Fields()
-			//	mp := messageModel{}
-			//	mp.Name = msg.Name().UpperCamelCase().String()
-			//
-			//	list := make([]zapField, len(f.AllMessages()))
-			//
-			//	for _, v := range fields {
-			//
-			//		redact := false
-			//		_, err := v.Extension(zappb.E_Redact, &redact)
-			//		if err != nil {
-			//			m.Log(err)
-			//		}
-			//
-			//		r := zapField{
-			//			Redact:   redact,
-			//			Name:     v.Name().UpperCamelCase().String(),
-			//			Type:     v.Descriptor().Type.String(),
-			//			Label:    v.Descriptor().GetLabel().String(),
-			//			TypeName: v.Descriptor().GetTypeName(),
-			//		}
-			//		list = append(list, r)
-			//
-			//		//m.Log(r)
-			//
-			//	}
-			//	mp.Fields = list
-			//	fm.Messages = append(fm.Messages, mp)
-			//}
+
+			m.OverwriteGeneratorTemplateFile(
+				name,
+				T.Lookup("File"),
+				&fm,
+			)
 		}
 
-
-
-		m.OverwriteGeneratorTemplateFile(
-			name,
-			T.Lookup("File"),
-			&fm,
-		)
-	}
-
-	return m.Artifacts()
-
+		return m.Artifacts()
 }
 
 type rpcModel struct {
 	PackageName string
 	RpcName     string
-	Input    string
-	Output   string
-	GetString []string
-	Option   rightspb.MyRights
-	ChoiceOfRight int
+	Input       string
+	Output      string
+	Option      rightspb.MyRights
+	Resources   []Resource
+}
+
+type Resource struct {
+	IsRepeated  					bool
+	GetStrings   					[]map[string]bool
+	ResourceStringWithCurlyBraces 	string
+	ResourceStringWithFormatter     string
+	ForLoop     					[]ForLoop
+}
+
+type ForLoop struct {
+	RangeKey 	   string
+	ValueKey string
+	Level      int
 }
 
 type serviceModel struct {
 	ServiceName   string
-	PackageName string
-	Rpcs []rpcModel
+	PackageName   string
+	Rpcs          []rpcModel
 }
 
 type fileModel struct {
@@ -208,4 +391,20 @@ func addWordBoundariesToNumbers(s string) string {
 	b := []byte(s)
 	b = numberSequence.ReplaceAll(b, numberReplacement)
 	return string(b)
+}
+
+func reverseString(input []string) []string {
+	if len(input) == 0 {
+		return input
+	}
+	return append(reverseString(input[1:]), input[0])
+}
+
+func ReturnFields(field pgs.Field, fields []pgs.Field) []pgs.Field {
+
+	if field.Type().IsEmbed() {
+		fields = append(fields,ReturnFields(field, fields)...)
+	}
+	fields = append(fields, field)
+	return fields
 }

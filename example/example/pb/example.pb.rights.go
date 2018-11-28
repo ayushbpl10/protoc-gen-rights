@@ -10,88 +10,160 @@ import "go.uber.org/fx"
 import "go.appointy.com/google/pb/rights"
 import "go.appointy.com/google/userinfo"
 
-
 import "github.com/golang/protobuf/ptypes/empty"
 
 import "github.com/ayushbpl10/protoc-gen-rights/example/example/pb"
 
+type RightsUsersServer struct {
+	pb.UsersServer
+	rightsCli rights.RightValidatorsClient
+}
 
+func init() {
+	options = append(options, fx.Provide(NewRightsUsersClient))
+}
 
+type RightsUsersClientResult struct {
+	fx.Out
+	UsersClient pb.AcceptancesClient `name:"r"`
+}
 
+func NewRightsUsersClient(c rights.RightValidatorsClient, s pb.UsersServer) RightsUsersClientResult {
+	return RightsUsersClientResult{UsersClient: pb.NewLocalUsersClient(NewRightsUsersServer(c, s))}
+}
+func NewRightsUsersServer(c rights.RightValidatorsClient, s pb.UsersServer) pb.UsersServer {
+	return &RightsUsersServer{
+		s,
+		c,
+	}
+}
 
+func (s *RightsUsersServer) AddUser(ctx context.Context, rightsvar *pb.User) (*empty.Empty, error) {
 
-    type RightsUsersServer struct {
-        pb.UsersServer
-        rightsCli rights.RightValidatorsClient
-    }
+	ResourcePathOR := make([]string, 0)
+	ResourcePathAND := make([]string, 0)
 
-    func init() {
-        options = append(options, fx.Provide(NewRightsUsersClient))
-    }
+	for _, Blocked := range rightsvar.GetBlocked() {
 
-    type RightsUsersClientResult struct {
-        fx.Out
-        UsersClient pb.AcceptancesClient `name:"r"`
-    }
+		ResourcePathAND = append(ResourcePathAND,
 
-    func NewRightsUsersClient(c rights.RightValidatorsClient, s pb.UsersServer) RightsUsersClientResult {
-        return RightsUsersClientResult{ UsersClient: pb.NewLocalUsersClient(NewRightsUsersServer(c, s))}
-    }
-    func NewRightsUsersServer(c rights.RightValidatorsClient, s pb.UsersServer) pb.UsersServer {
-        return &RightsUsersServer{
-            s,
-            c,
-        }
-    }
+			fmt.Sprintf("/users/%s/cards.read/%s",
 
-    
-        func (s *RightsUsersServer) AddUser(ctx context.Context, rightsvar *pb.User) (*empty.Empty, error) {
+				rightsvar.GetId(),
 
+				Blocked,
+			),
+		)
 
+	}
 
-            res, err := s.rightsCli.IsValid(ctx, &rights.IsValidReq{
-                ResourcePath: []string{ fmt.Sprintf("/users/%s/cards/",  rightsvar.GetUserId(),  ),fmt.Sprintf("/users/%s/cards/user",  rightsvar.GetUserId(),  ), },
-                Value:        2,
-                Choice:       0,
-                UserId:       userinfo.FromContext(ctx).Id,
-            })
-            if err != nil {
-                return nil, err
-            }
+	ResourcePathOR = append(ResourcePath,
 
+		fmt.Sprintf("/users/%s/cards/user.write",
 
+			rightsvar.GetId(),
+		),
+	)
 
+	res, err := s.rightsCli.IsValid(ctx, &rights.IsValidReq{
+		ResourcePathOR:  ResourcePath,
+		ResourcePathAND: ResourcePathAND,
+		UserId:          userinfo.FromContext(ctx).Id,
+		ModuleName:      "Users",
+	})
+	if err != nil {
+		return nil, err
+	}
 
-            if !res.IsValid {
-                return nil, status.Errorf(codes.PermissionDenied, res.Reason)
-            }
-            return s.UsersServer.AddUser(ctx, rightsvar)
-        }
+	if !res.IsValid {
+		return nil, status.Errorf(codes.PermissionDenied, res.Reason)
+	}
+	return s.UsersServer.AddUser(ctx, rightsvar)
+}
 
-    
-        func (s *RightsUsersServer) GetUser(ctx context.Context, rightsvar *pb.GetUserReq) (*pb.User, error) {
+func (s *RightsUsersServer) GetUser(ctx context.Context, rightsvar *pb.GetUserReq) (*pb.User, error) {
 
+	ResourcePathOR := make([]string, 0)
+	ResourcePathAND := make([]string, 0)
 
+	for _, UserEmail := range rightsvar.GetUserEmail() {
 
-            res, err := s.rightsCli.IsValid(ctx, &rights.IsValidReq{
-                ResourcePath: []string{ fmt.Sprintf("/users/{user_id}/cards/%s",  rightsvar.GetUserId(),  rightsvar.GetTentId().GetTent(),  ),fmt.Sprintf("/users/{user_id}/cards/%s/ex",  rightsvar.GetUserId(),  rightsvar.GetTentId().GetTent(),  ), },
-                Value:        1,
-                Choice:       1,
-                UserId:       userinfo.FromContext(ctx).Id,
-            })
-            if err != nil {
-                return nil, err
-            }
+		for _, Checks := range UserEmail.GetChecks() {
 
+			ResourcePathAND = append(ResourcePathAND,
 
+				fmt.Sprintf("/%s/users/%s/cards/%s/email/%s",
 
+					UserEmail.GetEmail(),
 
-            if !res.IsValid {
-                return nil, status.Errorf(codes.PermissionDenied, res.Reason)
-            }
-            return s.UsersServer.GetUser(ctx, rightsvar)
-        }
+					rightsvar.GetUserId(),
 
-    
+					rightsvar.GetTentId().GetTent(),
 
+					Checks.GetCheck(),
+				),
+			)
 
+		}
+
+	}
+
+	ResourcePathOR = append(ResourcePath,
+
+		fmt.Sprintf("/users/%s/cards/%s/ex.write",
+
+			rightsvar.GetUserId(),
+
+			rightsvar.GetTentId().GetTent(),
+		),
+	)
+
+	res, err := s.rightsCli.IsValid(ctx, &rights.IsValidReq{
+		ResourcePathOR:  ResourcePath,
+		ResourcePathAND: ResourcePathAND,
+		UserId:          userinfo.FromContext(ctx).Id,
+		ModuleName:      "Users",
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if !res.IsValid {
+		return nil, status.Errorf(codes.PermissionDenied, res.Reason)
+	}
+	return s.UsersServer.GetUser(ctx, rightsvar)
+}
+
+func (s *RightsUsersServer) UpdateUser(ctx context.Context, rightsvar *pb.UpdateUserReq) (*empty.Empty, error) {
+
+	ResourcePathOR := make([]string, 0)
+	ResourcePathAND := make([]string, 0)
+
+	ResourcePathOR = append(ResourcePath,
+
+		fmt.Sprintf("/users/%s/cards.read/",
+
+			rightsvar.GetId(),
+		),
+
+		fmt.Sprintf("/users/%s/cards/user.write",
+
+			rightsvar.GetId(),
+		),
+	)
+
+	res, err := s.rightsCli.IsValid(ctx, &rights.IsValidReq{
+		ResourcePathOR:  ResourcePath,
+		ResourcePathAND: ResourcePathAND,
+		UserId:          userinfo.FromContext(ctx).Id,
+		ModuleName:      "Users",
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if !res.IsValid {
+		return nil, status.Errorf(codes.PermissionDenied, res.Reason)
+	}
+	return s.UsersServer.UpdateUser(ctx, rightsvar)
+}

@@ -46,19 +46,77 @@ import "{{ .}}"
     {{ range $rpc := $service.Rpcs }}
         func (s *Rights{{$service.ServiceName}}Server) {{$rpc.RpcName}}(ctx context.Context, rightsvar *{{ $rpc.PackageName }}.{{$rpc.Input}}) ({{if eq $rpc.Output "Empty"}}*empty.{{$rpc.Output}}{{else}}*{{ $rpc.PackageName }}.{{$rpc.Output}}{{end}}, error) {
 
+            ResourcePathOR := make([]string,0)
+            ResourcePathAND := make([]string,0)
 
+            {{range $resource := $rpc.Resources}}
+
+                 {{if $resource.IsRepeated}}
+
+                        {{ range $i,$forloop := $resource.ForLoop}}
+
+                            for _, {{$forloop.ValueKey}} := range {{if eq $i 0}}rightsvar.{{end}}{{$forloop.RangeKey}}() {
+
+                        {{ end }}
+
+                        ResourcePathAND = append(ResourcePathAND,
+
+                                                            fmt.Sprintf("{{$resource.ResourceStringWithFormatter}}",
+
+                                                            {{ range $resource.GetStrings}}
+
+
+                                                                {{range $getStrKey,$notincluderightsvar :=  .}}
+
+                                                                    {{if eq $notincluderightsvar false}}rightsvar.{{end}}{{$getStrKey}},
+
+                                                                {{end}}
+
+                                                            {{end}} ),
+
+                                                         )
+                        {{ range $forloop := $resource.ForLoop}}
+
+                            }
+                        {{ end }}
+
+
+                  {{ end }}
+
+             {{ end }}
+
+            ResourcePathOR = append(ResourcePath,
+
+            {{range $resource := $rpc.Resources}}
+
+                {{if eq $resource.IsRepeated false}}
+
+                    fmt.Sprintf("{{$resource.ResourceStringWithFormatter}}",
+                        {{ range $resource.GetStrings}}
+
+                            {{range $getStrKey,$notincluderightsvar :=  .}}
+
+                                {{if eq $notincluderightsvar false}}rightsvar.{{end}}{{$getStrKey}},
+
+                            {{end}}
+
+                        {{end}} ),
+
+                {{end}}
+
+            {{end}}
+
+            )
 
             res, err := s.rightsCli.IsValid(ctx, &rights.IsValidReq{
-                ResourcePath: []string{ {{ range $rpc.Option.Resource}}fmt.Sprintf("{{.}}", {{ range $rpc.GetString}} rightsvar.{{.}}, {{end}} ),{{end}} },
-                Value:        {{$rpc.Option.Right}},
-                Choice:       {{$rpc.ChoiceOfRight}},
+                ResourcePathOR :  ResourcePath,
+                ResourcePathAND:  ResourcePathAND,
                 UserId:       userinfo.FromContext(ctx).Id,
+                ModuleName:   "{{$service.ServiceName}}",
             })
             if err != nil {
                 return nil, err
             }
-
-
 
 
             if !res.IsValid {

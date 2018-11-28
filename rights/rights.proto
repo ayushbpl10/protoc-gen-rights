@@ -12,11 +12,4 @@ extend google.protobuf.MethodOptions {
 
 message MyRights {
     repeated string resource = 1;
-    int32 right = 2;
-    ChoiceOfRight choice = 3;
-}
-
-enum ChoiceOfRight {
-    AND = 0;
-    OR = 1;
 }
