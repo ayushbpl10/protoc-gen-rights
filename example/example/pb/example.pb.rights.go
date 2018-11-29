@@ -8,15 +8,31 @@ import "google.golang.org/grpc/codes"
 import "google.golang.org/grpc/status"
 import "go.uber.org/fx"
 import "go.appointy.com/google/pb/rights"
-import "go.appointy.com/google/userinfo"
+import "github.com/ayushbpl10/protoc-gen-rights/example/rights"
 
 import "github.com/golang/protobuf/ptypes/empty"
 
 import "github.com/ayushbpl10/protoc-gen-rights/example/example/pb"
 
+const UsersResourcePaths = [...]string{
+
+	"/users/{id}/cards.read/{blocked}",
+
+	"/users/{id}/cards/user.write",
+
+	"/users/{user_id}/cards/{tent_id.tent}/ex.write",
+
+	"/{user_email.email}/users/{user_id}/cards/{tent_id.tent}/email/{user_email.email.checks.check.check_id.val_id}",
+
+	"/users/{email_ids.emails}/cards.read/",
+
+	"/users/{id}/cards/user.write",
+}
+
 type RightsUsersServer struct {
 	pb.UsersServer
 	rightsCli rights.RightValidatorsClient
+	user      right.UserIDer
 }
 
 func init() {
@@ -31,10 +47,11 @@ type RightsUsersClientResult struct {
 func NewRightsUsersClient(c rights.RightValidatorsClient, s pb.UsersServer) RightsUsersClientResult {
 	return RightsUsersClientResult{UsersClient: pb.NewLocalUsersClient(NewRightsUsersServer(c, s))}
 }
-func NewRightsUsersServer(c rights.RightValidatorsClient, s pb.UsersServer) pb.UsersServer {
+func NewRightsUsersServer(c rights.RightValidatorsClient, s pb.UsersServer, u right.UserIDer) pb.UsersServer {
 	return &RightsUsersServer{
 		s,
 		c,
+		u,
 	}
 }
 
@@ -68,7 +85,7 @@ func (s *RightsUsersServer) AddUser(ctx context.Context, rightsvar *pb.User) (*e
 	res, err := s.rightsCli.IsValid(ctx, &rights.IsValidReq{
 		ResourcePathOR:  ResourcePath,
 		ResourcePathAND: ResourcePathAND,
-		UserId:          userinfo.FromContext(ctx).Id,
+		UserId:          s.user.UserID(ctx),
 		ModuleName:      "Users",
 	})
 	if err != nil {
@@ -127,7 +144,7 @@ func (s *RightsUsersServer) GetUser(ctx context.Context, rightsvar *pb.GetUserRe
 	res, err := s.rightsCli.IsValid(ctx, &rights.IsValidReq{
 		ResourcePathOR:  ResourcePath,
 		ResourcePathAND: ResourcePathAND,
-		UserId:          userinfo.FromContext(ctx).Id,
+		UserId:          s.user.UserID(ctx),
 		ModuleName:      "Users",
 	})
 	if err != nil {
@@ -172,7 +189,7 @@ func (s *RightsUsersServer) UpdateUser(ctx context.Context, rightsvar *pb.Update
 	res, err := s.rightsCli.IsValid(ctx, &rights.IsValidReq{
 		ResourcePathOR:  ResourcePath,
 		ResourcePathAND: ResourcePathAND,
-		UserId:          userinfo.FromContext(ctx).Id,
+		UserId:          s.user.UserID(ctx),
 		ModuleName:      "Users",
 	})
 	if err != nil {

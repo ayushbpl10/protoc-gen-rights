@@ -10,10 +10,24 @@ import "google.golang.org/grpc/status"
 import "go.uber.org/fx"
 import "go.appointy.com/google/pb/rights"
 import "go.appointy.com/google/userinfo"
+import "github.com/ayushbpl10/protoc-gen-rights/example/rights"
+
+
 
 {{ range .Imports }}
 import "{{ .}}"
 {{ end }}
+
+
+{{range $serviceIn := .Services}}
+    const {{$serviceIn.ServiceName}}ResourcePaths = [...]string{
+    {{range $rpcIn := $serviceIn.Rpcs}}
+        {{range $resource := $rpcIn.Resources}}
+            "{{$resource.ResourceStringWithCurlyBraces}}",
+        {{end}}
+    {{end}}
+    }
+{{end}}
 
 {{ range $service := .Services }}
 
@@ -22,6 +36,7 @@ import "{{ .}}"
     type Rights{{$service.ServiceName}}Server struct {
         {{ .PackageName }}.{{$service.ServiceName}}Server
         rightsCli rights.RightValidatorsClient
+        user right.UserIDer
     }
 
     func init() {
@@ -36,10 +51,11 @@ import "{{ .}}"
     func NewRights{{$service.ServiceName}}Client(c rights.RightValidatorsClient, s {{ .PackageName }}.{{$service.ServiceName}}Server) Rights{{$service.ServiceName}}ClientResult {
         return Rights{{$service.ServiceName}}ClientResult{ {{$service.ServiceName}}Client: {{ .PackageName }}.NewLocal{{$service.ServiceName}}Client(NewRights{{$service.ServiceName}}Server(c, s))}
     }
-    func NewRights{{$service.ServiceName}}Server(c rights.RightValidatorsClient, s {{ .PackageName }}.{{$service.ServiceName}}Server) {{ .PackageName }}.{{$service.ServiceName}}Server {
+    func NewRights{{$service.ServiceName}}Server(c rights.RightValidatorsClient, s {{ .PackageName }}.{{$service.ServiceName}}Server, u right.UserIDer) {{ .PackageName }}.{{$service.ServiceName}}Server {
         return &Rights{{$service.ServiceName}}Server{
             s,
             c,
+            u,
         }
     }
 
@@ -109,10 +125,10 @@ import "{{ .}}"
             )
 
             res, err := s.rightsCli.IsValid(ctx, &rights.IsValidReq{
-                ResourcePathOR :  ResourcePath,
-                ResourcePathAND:  ResourcePathAND,
-                UserId:       userinfo.FromContext(ctx).Id,
-                ModuleName:   "{{$service.ServiceName}}",
+                ResourcePathOR  :  ResourcePath,
+                ResourcePathAND :  ResourcePathAND,
+                UserId          :  s.user.UserID(ctx),
+                ModuleName      :  "{{$service.ServiceName}}",
             })
             if err != nil {
                 return nil, err
