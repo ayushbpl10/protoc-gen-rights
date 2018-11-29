@@ -146,6 +146,7 @@ func (m *rightsGen) Execute(targets map[string]pgs.File, packages map[string]pgs
 									//m.Log(fr)
 									//[without curly braces] : Current For Loop Dotted Access
 									ForLoopMapWithGet := make(map[string]string, 0)
+									Level := 0
 									ForLoopMapWithOutGet := make(map[string]string, 0)
 									for _, r := range dotSeperatedkeys {
 
@@ -169,7 +170,9 @@ func (m *rightsGen) Execute(targets map[string]pgs.File, packages map[string]pgs
 
 										if IsRepeated {
 
+
 											if _, ok := ForLoopMapWithGet[fr]; !ok {
+												//m.Log(ForLoopMapWithGet[fr])
 												ForLoopMapWithGet[fr] = "Get" + toCamelInitCase(r, true)
 												ForLoopMapWithOutGet[fr] = toCamelInitCase(r, true)
 
@@ -180,17 +183,25 @@ func (m *rightsGen) Execute(targets map[string]pgs.File, packages map[string]pgs
 													}
 												}
 
+
 											} else {
 
-												//for loops already contains the previous repeated value
 												if strings.Contains(fr, ForLoopMapWithOutGet[fr]) {
 													resource.ForLoop = resource.ForLoop[0 : len(resource.ForLoop)-1]
 												}
+
 												ForLoopMapWithGet[fr] = ForLoopMapWithOutGet[fr] + "." + "Get" + toCamelInitCase(r, true)
+
+												//Level to add the ForLoopMapWithOutGet[fr] of the previous loop to next
+												if Level >= 0 {
+													ForLoopMapWithOutGet[fr] = toCamelInitCase(r, true)
+												}
+												Level+=1
 											}
 
 
 											forLoop := ForLoop{}
+											//m.Log(ForLoopMapWithGet[fr])
 											forLoop.RangeKey = ForLoopMapWithGet[fr]
 											forLoop.ValueKey = toCamelInitCase(r, true)
 

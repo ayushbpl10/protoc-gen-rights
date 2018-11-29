@@ -40,8 +40,14 @@ message UserEmails {
     repeated Check checks = 2;
 }
 
+
 message Check {
     string check = 1;
+    repeated Val check_id = 2;
+}
+
+message Val {
+    string val_id = 1;
 }
 
 message Demo {
@@ -49,6 +55,11 @@ message Demo {
 }
 message UpdateUserReq {
     string id = 1;
+    repeated UserEmail email_ids = 2;
+}
+
+message UserEmail {
+    repeated string emails = 1;
 }
 
 service Users {
@@ -60,13 +71,13 @@ service Users {
     };
     rpc GetUser(GetUserReq) returns (User) {
         option (rights.validator) = {
-            resource: "/{user_email.email}/users/{user_id}/cards/{tent_id.tent}/email/{user_email.email.checks.check}"
+            resource: "/{user_email.email}/users/{user_id}/cards/{tent_id.tent}/email/{user_email.email.checks.check.check_id.val_id}"
             resource: "/users/{user_id}/cards/{tent_id.tent}/ex.write"
         };
     };
     rpc UpdateUser(UpdateUserReq) returns (.google.protobuf.Empty){
         option (rights.validator) = {
-            resource: "/users/{id}/cards.read/"
+            resource: "/users/{email_ids.emails}/cards.read/"
             resource: "/users/{id}/cards/user.write"
         };
     }

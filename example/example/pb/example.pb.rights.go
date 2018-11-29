@@ -90,19 +90,25 @@ func (s *RightsUsersServer) GetUser(ctx context.Context, rightsvar *pb.GetUserRe
 
 		for _, Checks := range UserEmail.GetChecks() {
 
-			ResourcePathAND = append(ResourcePathAND,
+			for _, CheckId := range Checks.GetCheckId() {
 
-				fmt.Sprintf("/%s/users/%s/cards/%s/email/%s",
+				ResourcePathAND = append(ResourcePathAND,
 
-					UserEmail.GetEmail(),
+					fmt.Sprintf("/%s/users/%s/cards/%s/email/%s",
 
-					rightsvar.GetUserId(),
+						UserEmail.GetEmail(),
 
-					rightsvar.GetTentId().GetTent(),
+						rightsvar.GetUserId(),
 
-					Checks.GetCheck(),
-				),
-			)
+						rightsvar.GetTentId().GetTent(),
+
+						Checks.GetCheck(),
+
+						CheckId.GetValId(),
+					),
+				)
+
+			}
 
 		}
 
@@ -139,12 +145,23 @@ func (s *RightsUsersServer) UpdateUser(ctx context.Context, rightsvar *pb.Update
 	ResourcePathOR := make([]string, 0)
 	ResourcePathAND := make([]string, 0)
 
+	for _, EmailIds := range rightsvar.GetEmailIds() {
+
+		for _, Emails := range EmailIds.GetEmails() {
+
+			ResourcePathAND = append(ResourcePathAND,
+
+				fmt.Sprintf("/users/%s/cards.read/",
+
+					Emails,
+				),
+			)
+
+		}
+
+	}
+
 	ResourcePathOR = append(ResourcePath,
-
-		fmt.Sprintf("/users/%s/cards.read/",
-
-			rightsvar.GetId(),
-		),
 
 		fmt.Sprintf("/users/%s/cards/user.write",
 
